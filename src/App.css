@@ -294,6 +294,26 @@ main {
   font-weight: 500;
 }
 
+.info-message {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-weight: 500;
+}
+
+.info-message a {
+  color: #1e40af;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.info-message a:hover {
+  color: #1e3a8a;
+}
+
 .results-count {
   margin-bottom: var(--space-4);
   font-weight: 600;

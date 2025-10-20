@@ -15,6 +15,7 @@ function App() {
   const [flights, setFlights] = React.useState<FlightOffer[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [isUsingMockData, setIsUsingMockData] = React.useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +40,19 @@ function App() {
 
       const flightOffers = await searchFlights(searchParams);
       setFlights(flightOffers);
+      setIsUsingMockData(false);
       
       if (flightOffers.length === 0) {
         setError('No flights found for your search criteria. Please try different dates or airports.');
       }
     } catch (err) {
       console.error('Flight search error:', err);
-      setError('Unable to search flights at the moment. Please try again later.');
+      if (err instanceof Error && err.message === 'API_CREDENTIALS_MISSING') {
+        setIsUsingMockData(true);
+        // Don't show error for mock data - it's expected behavior
+      } else {
+        setError('Unable to search flights at the moment. Please try again later.');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -171,6 +178,12 @@ function App() {
             {error && (
               <div className="error-message" role="alert" aria-live="assertive">
                 {error}
+              </div>
+            )}
+            
+            {isUsingMockData && (
+              <div className="info-message" role="status" aria-live="polite">
+                ℹ️ Demo Mode: Showing sample flight data. <a href="https://developers.amadeus.com/" target="_blank" rel="noopener noreferrer">Get API keys</a> for real flight search.
               </div>
             )}
             

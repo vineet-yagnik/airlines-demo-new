@@ -127,7 +127,10 @@ async function getAccessToken(): Promise<string> {
 
   // If no API credentials, fall back to mock data
   if (!API_CONFIG.clientId || !API_CONFIG.clientSecret) {
-    console.warn('Amadeus API credentials not configured, using mock data');
+    if (API_CONFIG.isDevelopment) {
+      console.info('🛫 Airlines Demo: Using mock flight data (Amadeus API not configured)');
+      console.info('💡 To use real flights: Get API keys from https://developers.amadeus.com/');
+    }
     throw new Error('API_CREDENTIALS_MISSING');
   }
 
@@ -195,13 +198,18 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightO
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Flight search error:', error);
+    if (API_CONFIG.isDevelopment) {
+      console.error('Flight search API error:', error);
+    }
     
     // Fall back to mock data if API fails
     if (error instanceof Error && 
         (error.message === 'API_CREDENTIALS_MISSING' || 
          error.message === 'AUTHENTICATION_FAILED' ||
          API_CONFIG.isDevelopment)) {
+      if (API_CONFIG.isDevelopment && error.message !== 'API_CREDENTIALS_MISSING') {
+        console.info('🛫 Falling back to mock flight data due to API error');
+      }
       return getMockFlightData(params);
     }
     
@@ -222,15 +230,27 @@ function getMockFlightData(params: FlightSearchParams): FlightOffer[] {
   ];
 
   const mockOffers: FlightOffer[] = [];
+  
+  // Generate varied pricing based on route length and demand
+  const basePrice = 150 + Math.random() * 700;
+  const routeMultiplier = params.originLocationCode === params.destinationLocationCode ? 1 : 
+    (Math.abs(params.originLocationCode.charCodeAt(0) - params.destinationLocationCode.charCodeAt(0)) / 10);
 
   for (let i = 0; i < 5; i++) {
     const airline = airlines[i % airlines.length];
-    const basePrice = 200 + Math.random() * 800;
+    const adjustedPrice = (basePrice + (routeMultiplier * 50) + (Math.random() * 200)).toFixed(2);
+    
+    // Create realistic departure times throughout the day
     const departureTime = new Date(params.departureDate);
-    departureTime.setHours(6 + i * 3, Math.random() * 60);
+    departureTime.setHours(6 + i * 3 + Math.floor(Math.random() * 2), Math.random() * 60);
+    
+    // Calculate realistic flight duration (2-12 hours depending on route)
+    const baseDuration = 2 + Math.random() * 6;
+    const flightDurationHours = Math.floor(baseDuration);
+    const flightDurationMinutes = Math.floor((baseDuration - flightDurationHours) * 60);
     
     const arrivalTime = new Date(departureTime);
-    arrivalTime.setHours(arrivalTime.getHours() + 3 + Math.random() * 8);
+    arrivalTime.setHours(arrivalTime.getHours() + flightDurationHours, arrivalTime.getMinutes() + flightDurationMinutes);
 
     mockOffers.push({
       id: `mock-offer-${i}`,
@@ -241,7 +261,7 @@ function getMockFlightData(params: FlightSearchParams): FlightOffer[] {
       lastTicketingDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       numberOfBookableSeats: Math.floor(Math.random() * 9) + 1,
       itineraries: [{
-        duration: `PT${Math.floor(3 + Math.random() * 8)}H${Math.floor(Math.random() * 60)}M`,
+        duration: `PT${flightDurationHours}H${flightDurationMinutes}M`,
         segments: [{
           departure: {
             iataCode: params.originLocationCode,
@@ -256,7 +276,7 @@ function getMockFlightData(params: FlightSearchParams): FlightOffer[] {
           aircraft: {
             code: '32A',
           },
-          duration: `PT${Math.floor(3 + Math.random() * 8)}H${Math.floor(Math.random() * 60)}M`,
+          duration: `PT${flightDurationHours}H${flightDurationMinutes}M`,
           id: `mock-segment-${i}`,
           numberOfStops: 0,
           blacklistedInEU: false,
@@ -264,13 +284,13 @@ function getMockFlightData(params: FlightSearchParams): FlightOffer[] {
       }],
       price: {
         currency: params.currencyCode || 'USD',
-        total: basePrice.toFixed(2),
-        base: (basePrice * 0.8).toFixed(2),
+        total: adjustedPrice,
+        base: (parseFloat(adjustedPrice) * 0.8).toFixed(2),
         fees: [{
-          amount: (basePrice * 0.1).toFixed(2),
+          amount: (parseFloat(adjustedPrice) * 0.1).toFixed(2),
           type: 'SUPPLIER',
         }],
-        grandTotal: basePrice.toFixed(2),
+        grandTotal: adjustedPrice,
       },
       pricingOptions: {
         fareType: ['PUBLISHED'],
@@ -283,9 +303,9 @@ function getMockFlightData(params: FlightSearchParams): FlightOffer[] {
         travelerType: 'ADULT',
         price: {
           currency: params.currencyCode || 'USD',
-          total: basePrice.toFixed(2),
-          base: (basePrice * 0.8).toFixed(2),
-          grandTotal: basePrice.toFixed(2),
+          total: adjustedPrice,
+          base: (parseFloat(adjustedPrice) * 0.8).toFixed(2),
+          grandTotal: adjustedPrice,
         },
         fareDetailsBySegment: [{
           segmentId: `mock-segment-${i}`,
@@ -359,7 +379,9 @@ export async function searchAirports(keyword: string): Promise<AirportLocation[]
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error('Airport search error:', error);
+    if (API_CONFIG.isDevelopment) {
+      console.error('Airport search error:', error);
+    }
     
     // Fall back to common airports
     const commonAirports: AirportLocation[] = [
