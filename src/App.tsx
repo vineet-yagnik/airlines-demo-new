@@ -1,7 +1,9 @@
 import React from 'react';
 import './App.css';
+import { searchFlights } from './lib/flight-api';
+import type { FlightOffer, FlightSearchParams } from './lib/flight-api';
 
-// Simple Airlines App component
+// Enhanced Airlines App component with real API integration
 function App() {
   const [searchData, setSearchData] = React.useState({
     from: '',
@@ -10,50 +12,11 @@ function App() {
     passengers: 1
   });
 
-  const [flights, setFlights] = React.useState<Array<{
-    id: string;
-    flightNumber: string;
-    airline: string;
-    departure: { airport: string; city: string; time: string };
-    arrival: { airport: string; city: string; time: string };
-    price: number;
-    duration: string;
-  }>>([]);
-
+  const [flights, setFlights] = React.useState<FlightOffer[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  // Mock flight data
-  const mockFlights = [
-    {
-      id: '1',
-      flightNumber: 'AA123',
-      airline: 'American Airlines',
-      departure: { airport: 'JFK', city: 'New York', time: '10:00' },
-      arrival: { airport: 'LAX', city: 'Los Angeles', time: '13:30' },
-      price: 299,
-      duration: '5h 30m'
-    },
-    {
-      id: '2', 
-      flightNumber: 'UA456',
-      airline: 'United Airlines',
-      departure: { airport: 'JFK', city: 'New York', time: '14:15' },
-      arrival: { airport: 'LAX', city: 'Los Angeles', time: '17:45' },
-      price: 325,
-      duration: '5h 30m'
-    },
-    {
-      id: '3',
-      flightNumber: 'DL789',
-      airline: 'Delta Airlines', 
-      departure: { airport: 'JFK', city: 'New York', time: '18:30' },
-      arrival: { airport: 'LAX', city: 'Los Angeles', time: '22:00' },
-      price: 275,
-      duration: '5h 30m'
-    }
-  ];
-
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchData.from || !searchData.to || !searchData.departure) {
       alert('Please fill in all required fields');
@@ -61,15 +24,58 @@ function App() {
     }
 
     setIsSearching(true);
-    // Simulate API call
-    setTimeout(() => {
-      setFlights(mockFlights);
+    setError(null);
+    setFlights([]);
+
+    try {
+      const searchParams: FlightSearchParams = {
+        originLocationCode: searchData.from.toUpperCase(),
+        destinationLocationCode: searchData.to.toUpperCase(),
+        departureDate: searchData.departure,
+        adults: searchData.passengers,
+        currencyCode: 'USD',
+        max: 10
+      };
+
+      const flightOffers = await searchFlights(searchParams);
+      setFlights(flightOffers);
+      
+      if (flightOffers.length === 0) {
+        setError('No flights found for your search criteria. Please try different dates or airports.');
+      }
+    } catch (err) {
+      console.error('Flight search error:', err);
+      setError('Unable to search flights at the moment. Please try again later.');
+    } finally {
       setIsSearching(false);
-    }, 1000);
+    }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
     setSearchData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFlightSelect = (flight: FlightOffer) => {
+    // Here you would typically navigate to a booking page or show booking details
+    alert(`Selected flight ${flight.itineraries[0].segments[0].carrierCode}${flight.itineraries[0].segments[0].number} for $${flight.price.total}`);
+  };
+
+  const formatTime = (dateTimeString: string) => {
+    return new Date(dateTimeString).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  };
+
+  const formatDuration = (duration: string) => {
+    // Convert ISO 8601 duration (PT3H30M) to readable format (3h 30m)
+    const match = duration.match(/PT(\d+H)?(\d+M)?/);
+    if (!match) return duration;
+    
+    const hours = match[1] ? match[1].replace('H', 'h ') : '';
+    const minutes = match[2] ? match[2].replace('M', 'm') : '';
+    return (hours + minutes).trim();
   };
 
   return (
@@ -152,55 +158,67 @@ function App() {
           </form>
         </section>
 
-        {flights.length > 0 && (
-          <section className="results-section" aria-label="Flight results">
-            <h2>Available Flights</h2>
+                {flights.length > 0 && (
+          <section className="results-section" aria-label="Flight search results">
             <div 
-              className="results-announcement" 
+              className="results-count" 
+              role="status" 
               aria-live="polite"
-              role="status"
             >
               {flights.length} flights found
             </div>
             
+            {error && (
+              <div className="error-message" role="alert" aria-live="assertive">
+                {error}
+              </div>
+            )}
+            
             <div className="flights-list">
-              {flights.map((flight) => (
-                <div key={flight.id} className="flight-card" data-testid="flight-card">
-                  <div className="flight-header">
-                    <h3>{flight.airline}</h3>
-                    <div className="flight-number">{flight.flightNumber}</div>
-                  </div>
-                  
-                  <div className="flight-route">
-                    <div className="flight-location">
-                      <div className="airport">{flight.departure.airport}</div>
-                      <div className="city">{flight.departure.city}</div>
-                      <div className="time">{flight.departure.time}</div>
+              {flights.map((flight) => {
+                const segment = flight.itineraries[0].segments[0];
+                const departureTime = formatTime(segment.departure.at);
+                const arrivalTime = formatTime(segment.arrival.at);
+                const duration = formatDuration(flight.itineraries[0].duration);
+                
+                return (
+                  <div key={flight.id} className="flight-card" data-testid="flight-card">
+                    <div className="flight-header">
+                      <h3>{segment.carrierCode} Airlines</h3>
+                      <div className="flight-number">{segment.carrierCode}{segment.number}</div>
                     </div>
                     
-                    <div className="flight-duration">
-                      <div>✈️</div>
-                      <div>{flight.duration}</div>
+                    <div className="flight-route">
+                      <div className="flight-location">
+                        <div className="airport">{segment.departure.iataCode}</div>
+                        <div className="city">{segment.departure.iataCode}</div>
+                        <div className="time">{departureTime}</div>
+                      </div>
+                      
+                      <div className="flight-duration">
+                        <div>✈️</div>
+                        <div>{duration}</div>
+                      </div>
+                      
+                      <div className="flight-location">
+                        <div className="airport">{segment.arrival.iataCode}</div>
+                        <div className="city">{segment.arrival.iataCode}</div>
+                        <div className="time">{arrivalTime}</div>
+                      </div>
                     </div>
                     
-                    <div className="flight-location">
-                      <div className="airport">{flight.arrival.airport}</div>
-                      <div className="city">{flight.arrival.city}</div>
-                      <div className="time">{flight.arrival.time}</div>
+                    <div className="flight-footer">
+                      <div className="price">${flight.price.total}</div>
+                      <button 
+                        className="select-button"
+                        onClick={() => handleFlightSelect(flight)}
+                      >
+                        Select Flight
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flight-footer">
-                    <div className="price">${flight.price}</div>
-                    <button 
-                      className="select-button"
-                      onClick={() => alert(`Selected ${flight.flightNumber}`)}
-                    >
-                      Select Flight
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

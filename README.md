@@ -44,9 +44,27 @@ cd airlines-demo-new
 # Install dependencies
 npm install
 
+# Set up environment variables (optional - uses mock data if not configured)
+cp .env.example .env
+# Edit .env and add your Amadeus API credentials
+
 # Start development server
 npm run dev
 ```
+
+### API Configuration (Optional)
+
+The application can use real flight data from the Amadeus Travel API:
+
+1. **Get API credentials**: Sign up at https://developers.amadeus.com/
+2. **Create `.env` file** from `.env.example`
+3. **Add your credentials**:
+   ```
+   VITE_AMADEUS_CLIENT_ID=your_client_id
+   VITE_AMADEUS_CLIENT_SECRET=your_client_secret
+   ```
+
+**Note**: Without API credentials, the app will use enhanced mock data that provides a realistic flight search experience.
 
 ### Available Scripts
 ```bash

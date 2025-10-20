@@ -282,3 +282,20 @@ main {
     width: 100%;
   }
 }
+
+/* Error handling styles */
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-weight: 500;
+}
+
+.results-count {
+  margin-bottom: var(--space-4);
+  font-weight: 600;
+  color: var(--color-secondary-600);
+}
